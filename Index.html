@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Farmaci</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <style>
+        .pwa-install { border-radius: 12px; }
+        body { background-color: #f3f4f6; font-family: sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- CONFIGURAZIONE (DA COMPILARE) ---
+        const firebaseConfig = {
+            apiKey: "IL_TUO_API_KEY",
+            projectId: "IL_TUO_PROJECT_ID",
+            // ... altri dati da console Firebase
+        };
+
+        emailjs.init("LA_TUA_PUBLIC_KEY");
+
+        const App = () => {
+            const [farmaci, setFarmaci] = useState([
+                // Esempio dati iniziali (poi verranno da Firebase)
+                { id: 1, nome: "Cardioaspirina", principio: "Acido Acetilsalicilico", dose: "100mg", funzione: "Cuore", scorta: 28, consumoDie: 1 },
+                { id: 2, nome: "Prazene", principio: "Prazepam", dose: "10mg", funzione: "Ansia", scorta: 15, consumoDie: 0.5 }
+            ]);
+
+            const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleDateString());
+
+            // 1. Logica Scarico Automatico (Simulata)
+            useEffect(() => {
+                const checkAutoDecrement = () => {
+                    const today = new Date().toLocaleDateString();
+                    if (lastUpdate !== today) {
+                        const nuoviFarmaci = farmaci.map(f => ({
+                            ...f,
+                            scorta: f.scorta - f.consumoDie
+                        }));
+                        setFarmaci(nuoviFarmaci);
+                        setLastUpdate(today);
+                        controllaScadenze(nuoviFarmaci);
+                    }
+                };
+                checkAutoDecrement();
+            }, []);
+
+            // 2. Calcolo Data Fine e Invio Email
+            const controllaScadenze = (lista) => {
+                const analisi = lista.map(f => {
+                    const giorniResidui = Math.floor(f.scorta / f.consumoDie);
+                    return { ...f, giorniResidui };
+                }).sort((a, b) => a.giorniResidui - b.giorniResidui);
+
+                // Se il primo scade tra 5 giorni, invia email
+                if (analisi[0].giorniResidui === 5) {
+                    const templateParams = {
+                        main_drug: analisi[0].nome,
+                        expiry_date: analisi[0].giorniResidui,
+                        other_drugs: `${analisi[1].nome}, ${analisi[2].nome}`
+                    };
+                    // emailjs.send('SERVICE_ID', 'TEMPLATE_ID', templateParams);
+                    console.log("Email inviata per:", analisi[0].nome);
+                }
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen pb-20">
+                    <header className="bg-blue-600 text-white p-6 shadow-lg">
+                        <h1 className="text-xl font-bold">Terapia di Papà</h1>
+                        <p className="text-sm opacity-80">Monitoraggio Scorte</p>
+                    </header>
+
+                    <main className="p-4">
+                        <h2 className="text-gray-600 font-semibold mb-4">Stato Magazzino</h2>
+                        
+                        {farmaci.map(f => {
+                            const giorni = Math.floor(f.scorta / f.consumoDie);
+                            const isCritical = giorni <= 5;
+
+                            return (
+                                <div key={f.id} className={`mb-4 p-4 rounded-2xl shadow-sm border ${isCritical ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-lg text-gray-800">{f.nome}</h3>
+                                            <p className="text-xs text-gray-500 uppercase">{f.principio}</p>
+                                        </div>
+                                        <div className={`text-sm font-bold px-3 py-1 rounded-full ${isCritical ? 'bg-red-500 text-white' : 'bg-green-100 text-green-700'}`}>
+                                            {giorni} gg
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-4">
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span>Scorta attuale: {f.scorta} unità</span>
+                                            <span>Dose: {f.consumoDie}/die</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                                className={`h-2 rounded-full ${isCritical ? 'bg-red-500' : 'bg-blue-500'}`} 
+                                                style={{width: `${Math.min((giorni/30)*100, 100)}%`}}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-2 text-xs text-blue-600 font-medium">
+                                        Scopo: {f.funzione}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </main>
+
+                    {/* Navigazione Bottom Mobile */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-around text-xs text-gray-600">
+                        <button className="flex flex-col items-center text-blue-600">
+                            <span>🏠</span>
+                            <span>Dashboard</span>
+                        </button>
+                        <button className="flex flex-col items-center">
+                            <span>📦</span>
+                            <span>Carica Scorte</span>
+                        </button>
+                        <button className="flex flex-col items-center">
+                            <span>⚙️</span>
+                            <span>Impostazioni</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
